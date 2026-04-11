@@ -1,0 +1,68 @@
+# ============================================
+# GIT IGNORE - MULTIMODAL FINANCIAL RAG
+# ============================================
+
+# --- Virtual Environment ---
+venv/
+env/
+.env
+*.env
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# --- Data Files (too large for git) ---
+data/raw/*
+data/processed/*
+data/images/*
+data/exports/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/images/.gitkeep
+!data/exports/.gitkeep
+
+# --- Vector Store Data ---
+vectorstore_data/chroma/*
+vectorstore_data/faiss/*
+!vectorstore_data/chroma/.gitkeep
+!vectorstore_data/faiss/.gitkeep
+
+# --- Models ---
+models/*
+!models/.gitkeep
+
+# --- Logs ---
+logs/*
+!logs/.gitkeep
+
+# --- VS Code ---
+.vscode/
+*.code-workspace
+
+# --- macOS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# --- Jupyter Notebooks (outputs) ---
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# --- Testing ---
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# --- Misc ---
+*.log
+*.tmp
+*.temp

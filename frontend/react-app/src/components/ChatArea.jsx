@@ -1,0 +1,131 @@
+import { useState, useRef, useEffect } from 'react'
+import { Send, Loader2, Bot } from 'lucide-react'
+import MessageBubble from './MessageBubble'
+import { askQuestion } from '../services/api'
+
+const WELCOME_MESSAGE = {
+  role:    'assistant',
+  content: "👋 Hello! I'm your Tesla Financial Intelligence assistant. Ask me anything about Tesla's Q3 2023 financial report — revenue, margins, deliveries, charts, and more!",
+  sources:  [],
+  metadata: {},
+}
+
+export default function ChatArea({ selectedQuestion }) {
+  const [messages, setMessages] = useState([WELCOME_MESSAGE])
+  const [input,    setInput]    = useState('')
+  const [loading,  setLoading]  = useState(false)
+  const bottomRef = useRef(null)
+  const inputRef  = useRef(null)
+
+  // Auto scroll to bottom
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  // Handle sample question from sidebar
+  useEffect(() => {
+    if (selectedQuestion) {
+      handleSend(selectedQuestion)
+    }
+  }, [selectedQuestion])
+
+  const handleSend = async (questionOverride = null) => {
+    const question = questionOverride || input.trim()
+    if (!question || loading) return
+
+    setInput('')
+    setLoading(true)
+
+    // Add user message
+    setMessages(prev => [...prev, {
+      role:    'user',
+      content: question,
+    }])
+
+    try {
+      const data = await askQuestion(question, 8)
+
+      setMessages(prev => [...prev, {
+        role:    'assistant',
+        content: data.answer,
+        sources: data.sources || [],
+        metadata: {
+          total_chunks_used:       data.total_chunks_used,
+          processing_time_seconds: data.processing_time_seconds,
+          types_used:              data.types_used,
+        },
+      }])
+
+    } catch (err) {
+      setMessages(prev => [...prev, {
+        role:    'assistant',
+        content: '❌ Error: Could not connect to backend. Make sure the FastAPI server is running.',
+        sources:  [],
+        metadata: {},
+      }])
+    } finally {
+      setLoading(false)
+      inputRef.current?.focus()
+    }
+  }
+
+  return (
+    <div className="flex flex-col flex-1 overflow-hidden">
+
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto p-6 chat-scroll">
+        {messages.map((msg, i) => (
+          <MessageBubble key={i} message={msg} />
+        ))}
+
+        {/* Typing Indicator */}
+        {loading && (
+          <div className="flex items-start gap-2 mb-4 fade-in">
+            <div className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center">
+              <Bot size={14} className="text-blue-600" />
+            </div>
+            <div className="bg-white border border-slate-200 px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm">
+              <div className="flex items-center gap-1.5">
+                <Loader2 size={14} className="text-blue-600 animate-spin" />
+                <span className="text-sm text-slate-400">Thinking...</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input Area */}
+      <div className="border-t border-slate-200 bg-white p-4">
+        <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus-within:border-blue-400 focus-within:bg-white transition-all">
+          <input
+            ref         = {inputRef}
+            type        = "text"
+            value       = {input}
+            onChange    = {e => setInput(e.target.value)}
+            onKeyDown   = {e => e.key === 'Enter' && !e.shiftKey && handleSend()}
+            placeholder = "Ask about Tesla's financials..."
+            className   = "flex-1 bg-transparent text-sm text-slate-700 placeholder-slate-400 outline-none"
+            disabled    = {loading}
+          />
+          <button
+            onClick  = {() => handleSend()}
+            disabled = {!input.trim() || loading}
+            className= {`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+              input.trim() && !loading
+                ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+            }`}
+          >
+            <Send size={14} />
+          </button>
+        </div>
+        <p className="text-center text-xs text-slate-400 mt-2">
+          Powered by Multimodal RAG · 📝 Text · 📊 Tables · 📈 Charts
+        </p>
+      </div>
+
+    </div>
+  )
+}
