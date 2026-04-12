@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import {
-  Database, FileText, Lightbulb,
-  Settings, ChevronRight, MessageSquare, X
+  Database, FileText, Lightbulb, Settings,
+  ChevronRight, MessageSquare, X, Upload,
+  CheckCircle, AlertCircle, Loader2
 } from 'lucide-react'
-import { getStats, getDocuments } from '../services/api'
+import { getStats, getDocuments, uploadDocument } from '../services/api'
 
 const SAMPLE_QUESTIONS = [
   "What was Tesla's total revenue in Q3 2023?",
@@ -23,14 +24,92 @@ export default function Sidebar({
   onSelectChat,
   onDeleteChat,
 }) {
-  const [stats,    setStats]    = useState(null)
-  const [docs,     setDocs]     = useState([])
-  const [nResults, setNResults] = useState(8)
+  const [stats,         setStats]         = useState(null)
+  const [docs,          setDocs]          = useState([])
+  const [nResults,      setNResults]      = useState(8)
+  const [uploading,     setUploading]     = useState(false)
+  const [uploadProgress,setUploadProgress]= useState(0)
+  const [uploadStatus,  setUploadStatus]  = useState(null) // 'success' | 'error' | null
+  const [uploadMessage, setUploadMessage] = useState('')
+  const [dragOver,      setDragOver]      = useState(false)
+  const [fiscalQuarter, setFiscalQuarter] = useState('')
+  const [extractGraphs, setExtractGraphs] = useState(false)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
+    fetchData()
+  }, [])
+
+  const fetchData = () => {
     getStats().then(setStats).catch(() => {})
     getDocuments().then(d => setDocs(d.documents || [])).catch(() => {})
-  }, [])
+  }
+
+  const handleFileUpload = async (file) => {
+    if (!file) return
+    if (!file.name.endsWith('.pdf')) {
+      setUploadStatus('error')
+      setUploadMessage('Only PDF files are supported')
+      return
+    }
+
+    setUploading(true)
+    setUploadProgress(0)
+    setUploadStatus(null)
+    setUploadMessage('')
+
+    try {
+      const result = await uploadDocument(
+        file,
+        fiscalQuarter,
+        extractGraphs,
+        (pct) => setUploadProgress(pct)
+      )
+
+      if (result.success) {
+        setUploadStatus('success')
+        setUploadMessage(
+          `✅ Ingested ${result.filename} — ${result.chunks_stored} chunks stored`
+        )
+        fetchData() // Refresh stats
+      } else {
+        setUploadStatus('error')
+        setUploadMessage(result.message || 'Upload failed')
+      }
+    } catch (err) {
+      setUploadStatus('error')
+      setUploadMessage(
+        err.response?.data?.detail || 'Upload failed. Try again.'
+      )
+    } finally {
+      setUploading(false)
+      setUploadProgress(0)
+      setTimeout(() => {
+        setUploadStatus(null)
+        setUploadMessage('')
+      }, 5000)
+    }
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files[0]
+    if (file) handleFileUpload(file)
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    setDragOver(true)
+  }
+
+  const handleDragLeave = () => setDragOver(false)
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0]
+    if (file) handleFileUpload(file)
+    e.target.value = ''
+  }
 
   if (!isOpen) return null
 
@@ -59,8 +138,6 @@ export default function Sidebar({
             <p className="text-xs text-slate-500 mt-0.5">Documents</p>
           </div>
         </div>
-
-        {/* Source Types */}
         <div className="flex gap-2 mt-2">
           {['📝 Text', '📊 Tables', '📈 Graphs'].map(t => (
             <span
@@ -73,7 +150,117 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Documents */}
+      {/* Document Upload */}
+      <div className="p-4 border-b border-slate-100">
+        <div className="flex items-center gap-2 mb-3">
+          <Upload size={14} className="text-blue-600" />
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            Upload Document
+          </span>
+        </div>
+
+        {/* Fiscal Quarter Input */}
+        <input
+          type        = "text"
+          placeholder = "Fiscal quarter (e.g. Q3-2023)"
+          value       = {fiscalQuarter}
+          onChange    = {e => setFiscalQuarter(e.target.value)}
+          className   = "w-full text-xs border border-slate-200 rounded-lg px-3 py-2 mb-2 outline-none focus:border-blue-400 text-slate-600 placeholder-slate-300"
+        />
+
+        {/* Extract Graphs Toggle */}
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs text-slate-500">
+            Extract graphs (slower)
+          </span>
+          <button
+            onClick   = {() => setExtractGraphs(!extractGraphs)}
+            className = {`w-10 h-5 rounded-full transition-colors relative ${
+              extractGraphs ? 'bg-blue-600' : 'bg-slate-200'
+            }`}
+          >
+            <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${
+              extractGraphs ? 'left-5' : 'left-0.5'
+            }`} />
+          </button>
+        </div>
+
+        {/* Drop Zone */}
+        <div
+          onDrop      = {handleDrop}
+          onDragOver  = {handleDragOver}
+          onDragLeave = {handleDragLeave}
+          onClick     = {() => !uploading && fileInputRef.current?.click()}
+          className   = {`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
+            dragOver
+              ? 'border-blue-400 bg-blue-50'
+              : uploading
+              ? 'border-slate-200 bg-slate-50 cursor-not-allowed'
+              : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50'
+          }`}
+        >
+          {uploading ? (
+            <div>
+              <Loader2
+                size={20}
+                className="text-blue-600 animate-spin mx-auto mb-2"
+              />
+              <p className="text-xs text-blue-600 font-medium mb-2">
+                Processing PDF...
+              </p>
+              {/* Progress Bar */}
+              <div className="w-full bg-slate-200 rounded-full h-1.5">
+                <div
+                  className="bg-blue-600 h-1.5 rounded-full transition-all"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                {uploadProgress}% uploaded
+              </p>
+            </div>
+          ) : (
+            <div>
+              <Upload
+                size={20}
+                className="text-slate-300 mx-auto mb-2"
+              />
+              <p className="text-xs text-slate-500 font-medium">
+                Drop PDF here
+              </p>
+              <p className="text-xs text-slate-300 mt-0.5">
+                or click to browse
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Hidden file input */}
+        <input
+          ref      = {fileInputRef}
+          type     = "file"
+          accept   = ".pdf"
+          onChange = {handleFileSelect}
+          className= "hidden"
+        />
+
+        {/* Upload Status */}
+        {uploadStatus && (
+          <div className={`flex items-start gap-2 mt-2 p-2 rounded-lg text-xs ${
+            uploadStatus === 'success'
+              ? 'bg-green-50 text-green-700 border border-green-200'
+              : 'bg-red-50 text-red-700 border border-red-200'
+          }`}>
+            {uploadStatus === 'success'
+              ? <CheckCircle size={12} className="flex-shrink-0 mt-0.5" />
+              : <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
+            }
+            {uploadMessage}
+          </div>
+        )}
+      </div>
+
+      {/* Documents List */}
       <div className="p-4 border-b border-slate-100">
         <div className="flex items-center gap-2 mb-3">
           <FileText size={14} className="text-blue-600" />
@@ -102,7 +289,7 @@ export default function Sidebar({
           ))
         ) : (
           <p className="text-xs text-slate-400 text-center py-2">
-            No documents ingested
+            No documents ingested yet
           </p>
         )}
       </div>
