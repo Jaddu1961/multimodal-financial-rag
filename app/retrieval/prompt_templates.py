@@ -1,11 +1,10 @@
 # ============================================
 # PROMPT TEMPLATES
-# All LLM prompts defined in one place
 # ============================================
 
 
 # --- Main RAG System Prompt ---
-RAG_SYSTEM_PROMPT = """You are a professional financial analyst assistant \
+RAG_SYSTEM_PROMPT = """You are a professional financial analyst assistant
 specialized in analyzing Tesla's financial reports.
 
 You will be given relevant context retrieved from Tesla's financial documents.
@@ -14,38 +13,63 @@ This context may include:
 - 📊 Table data with financial figures
 - 📈 Chart/graph descriptions showing trends
 
-Your job is to answer the user's question accurately based ONLY on the provided context.
+Your job is to answer the user's question accurately based ONLY on the
+provided context.
 
-Rules:
-1. Answer ONLY using the provided context — never use outside knowledge
-2. Always cite which type of source supports your answer (text, table, or chart)
-3. Be precise with numbers, percentages, and dates
-4. If the context doesn't contain enough information, say so clearly
-5. Keep answers clear, concise, and professional
-6. If multiple sources support the answer, mention all of them"""
+## FORMATTING RULES (VERY IMPORTANT):
+Always format your answers using this structure:
+
+1. Start with a brief **one-line summary** in bold
+2. Use ## for main sections
+3. Use **bold** for all numbers and key metrics
+4. Use bullet points (- ) for lists
+5. Use > for important quotes or highlights
+6. Always end with a ## Sources section
+
+## EXAMPLE FORMAT:
+**Tesla's total revenue in Q3 2023 was $23,350 million, a 9% YoY increase.**
+
+## Revenue Breakdown
+- **Total Revenue:** $23,350 million
+- **Automotive Revenue:** $19,625 million
+- **Energy & Services:** $3,725 million
+
+## Key Trends
+- 📈 Revenue grew **9%** compared to Q3 2022
+- 📉 Gross margin declined to **17.9%** from 25.1%
+
+## Sources Used
+- 📊 Table (Page 4) — Financial Summary
+- 📝 Text (Page 20) — Income Statement
+
+## STRICT RULES:
+- Answer ONLY using the provided context
+- NEVER make up numbers
+- If context is insufficient, say so clearly
+- Always cite source type (text/table/graph) and page number
+- Be precise with numbers and percentages"""
 
 
 # --- RAG User Prompt Template ---
-RAG_USER_PROMPT = """Here is the relevant context retrieved from Tesla's financial documents:
+RAG_USER_PROMPT = """Here is the relevant context from Tesla's financial documents:
 
 {context}
 
 ---
 
-Based on the context above, please answer this question:
-{question}"""
+Question: {question}
+
+Remember to format your answer using markdown with:
+- Bold numbers and key metrics
+- Bullet points for lists
+- Section headers (##)
+- Sources section at the end"""
 
 
 # --- Context Formatter ---
 def format_context(retrieved_chunks: list[dict]) -> str:
     """
-    Format retrieved chunks into a readable context string.
-
-    Args:
-        retrieved_chunks: List of dicts from store_manager.search()
-
-    Returns:
-        Formatted context string for the LLM prompt
+    Format retrieved chunks into readable context string.
     """
     if not retrieved_chunks:
         return "No relevant context found."
@@ -58,14 +82,12 @@ def format_context(retrieved_chunks: list[dict]) -> str:
         source     = chunk["metadata"].get("source_file", "unknown")
         score      = chunk.get("score", 0)
 
-        # --- Type emoji ---
         type_emoji = {
             "text":  "📝",
             "table": "📊",
             "graph": "📈",
         }.get(chunk_type, "📄")
 
-        # --- Format each chunk ---
         context_parts.append(
             f"[Source {i}] {type_emoji} {chunk_type.upper()} "
             f"| Page {page_num} | {source} | Relevance: {score:.2f}\n"
@@ -75,26 +97,12 @@ def format_context(retrieved_chunks: list[dict]) -> str:
     return "\n\n---\n\n".join(context_parts)
 
 
-# --- Standalone Question Prompt ---
-# Used to rephrase follow-up questions into standalone ones
-CONDENSE_QUESTION_PROMPT = """Given the following conversation history and \
-a follow-up question, rephrase the follow-up question to be a standalone \
-question that contains all necessary context.
-
-Conversation History:
-{chat_history}
-
-Follow-up Question: {question}
-
-Standalone Question:"""
-
-
 # --- No Context Response ---
-NO_CONTEXT_RESPONSE = """I couldn't find relevant information in the \
+NO_CONTEXT_RESPONSE = """I couldn't find relevant information in the
 Tesla financial documents to answer your question.
 
-This could mean:
-- The information is not in the ingested documents
+**Possible reasons:**
+- The information may not be in the ingested documents
 - Try rephrasing your question
 - Make sure the relevant Tesla report has been uploaded
 

@@ -11,16 +11,17 @@ const WELCOME_MESSAGE = {
 }
 
 export default function ChatArea({ selectedQuestion }) {
-  const [messages, setMessages] = useState([WELCOME_MESSAGE])
-  const [input,    setInput]    = useState('')
-  const [loading,  setLoading]  = useState(false)
+  const [messages,     setMessages]     = useState([WELCOME_MESSAGE])
+  const [input,        setInput]        = useState('')
+  const [loading,      setLoading]      = useState(false)
+  const [loadingSteps, setLoadingSteps] = useState([])
   const bottomRef = useRef(null)
   const inputRef  = useRef(null)
 
   // Auto scroll to bottom
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, loading])
 
   // Handle sample question from sidebar
   useEffect(() => {
@@ -36,6 +37,15 @@ export default function ChatArea({ selectedQuestion }) {
     setInput('')
     setLoading(true)
 
+    // --- Initialize loading steps ---
+    const steps = [
+      { label: '⚡ Embedding your question...',   active: true,  done: false },
+      { label: '🔍 Searching knowledge base...',  active: false, done: false },
+      { label: '🤖 Generating answer with AI...', active: false, done: false },
+      { label: '✅ Formatting response...',        active: false, done: false },
+    ]
+    setLoadingSteps(steps)
+
     // Add user message
     setMessages(prev => [...prev, {
       role:    'user',
@@ -43,8 +53,34 @@ export default function ChatArea({ selectedQuestion }) {
     }])
 
     try {
+      // --- Step 1: Embedding ---
+      await new Promise(r => setTimeout(r, 600))
+      setLoadingSteps(prev => prev.map((s, i) =>
+        i === 0 ? { ...s, active: false, done: true } :
+        i === 1 ? { ...s, active: true }              : s
+      ))
+
+      // --- Step 2: Searching ---
+      await new Promise(r => setTimeout(r, 600))
+      setLoadingSteps(prev => prev.map((s, i) =>
+        i === 1 ? { ...s, active: false, done: true } :
+        i === 2 ? { ...s, active: true }              : s
+      ))
+
+      // --- Step 3: API Call (actual work) ---
       const data = await askQuestion(question, 8)
 
+      // --- Step 4: Formatting ---
+      setLoadingSteps(prev => prev.map((s, i) =>
+        i === 2 ? { ...s, active: false, done: true } :
+        i === 3 ? { ...s, active: true }              : s
+      ))
+      await new Promise(r => setTimeout(r, 400))
+      setLoadingSteps(prev => prev.map((s, i) =>
+        i === 3 ? { ...s, active: false, done: true } : s
+      ))
+
+      // --- Add answer ---
       setMessages(prev => [...prev, {
         role:    'assistant',
         content: data.answer,
@@ -58,13 +94,14 @@ export default function ChatArea({ selectedQuestion }) {
 
     } catch (err) {
       setMessages(prev => [...prev, {
-        role:    'assistant',
-        content: '❌ Error: Could not connect to backend. Make sure the FastAPI server is running.',
+        role:     'assistant',
+        content:  '❌ Error: Could not connect to backend. Make sure the FastAPI server is running.',
         sources:  [],
         metadata: {},
       }])
     } finally {
       setLoading(false)
+      setLoadingSteps([])
       inputRef.current?.focus()
     }
   }
@@ -78,16 +115,39 @@ export default function ChatArea({ selectedQuestion }) {
           <MessageBubble key={i} message={msg} />
         ))}
 
-        {/* Typing Indicator */}
+        {/* Loading Steps Indicator */}
         {loading && (
           <div className="flex items-start gap-2 mb-4 fade-in">
-            <div className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center">
+            <div className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center flex-shrink-0">
               <Bot size={14} className="text-blue-600" />
             </div>
-            <div className="bg-white border border-slate-200 px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm">
-              <div className="flex items-center gap-1.5">
-                <Loader2 size={14} className="text-blue-600 animate-spin" />
-                <span className="text-sm text-slate-400">Thinking...</span>
+            <div className="bg-white border border-slate-200 px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm min-w-64">
+              <div className="space-y-2">
+                {loadingSteps.map((step, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    {step.done ? (
+                      <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                        <span className="text-green-600 text-xs">✓</span>
+                      </div>
+                    ) : step.active ? (
+                      <Loader2
+                        size={14}
+                        className="text-blue-600 animate-spin flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full bg-slate-100 flex-shrink-0" />
+                    )}
+                    <span className={`text-xs ${
+                      step.done
+                        ? 'text-green-600 font-medium'
+                        : step.active
+                        ? 'text-blue-600 font-medium'
+                        : 'text-slate-300'
+                    }`}>
+                      {step.label}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -110,9 +170,9 @@ export default function ChatArea({ selectedQuestion }) {
             disabled    = {loading}
           />
           <button
-            onClick  = {() => handleSend()}
-            disabled = {!input.trim() || loading}
-            className= {`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+            onClick   = {() => handleSend()}
+            disabled  = {!input.trim() || loading}
+            className = {`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
               input.trim() && !loading
                 ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
                 : 'bg-slate-200 text-slate-400 cursor-not-allowed'
