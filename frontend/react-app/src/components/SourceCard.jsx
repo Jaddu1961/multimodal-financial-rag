@@ -8,27 +8,39 @@ const TYPE_CONFIG = {
 }
 
 const COLOR_CLASSES = {
-  blue:   {
-    bg:     'bg-blue-50',
-    text:   'text-blue-700',
-    border: 'border-blue-200',
-    bar:    'bg-blue-500',
+  blue: {
+    bg:          'bg-blue-50',
+    text:        'text-blue-700',
+    border:      'border-blue-200',
+    bar:         'bg-blue-500',
+    highlight:   'bg-blue-100 border-l-2 border-blue-400',
+    activeBg:    'bg-blue-100',
   },
   purple: {
-    bg:     'bg-purple-50',
-    text:   'text-purple-700',
-    border: 'border-purple-200',
-    bar:    'bg-purple-500',
+    bg:          'bg-purple-50',
+    text:        'text-purple-700',
+    border:      'border-purple-200',
+    bar:         'bg-purple-500',
+    highlight:   'bg-purple-100 border-l-2 border-purple-400',
+    activeBg:    'bg-purple-100',
   },
-  green:  {
-    bg:     'bg-green-50',
-    text:   'text-green-700',
-    border: 'border-green-200',
-    bar:    'bg-green-500',
+  green: {
+    bg:          'bg-green-50',
+    text:        'text-green-700',
+    border:      'border-green-200',
+    bar:         'bg-green-500',
+    highlight:   'bg-green-100 border-l-2 border-green-400',
+    activeBg:    'bg-green-100',
   },
 }
 
-export default function SourceCard({ source, index }) {
+export default function SourceCard({
+  source,
+  index,
+  onHover,
+  onLeave,
+  isActive,
+}) {
   const [expanded, setExpanded] = useState(false)
 
   const type   = source.chunk_type || 'text'
@@ -38,11 +50,22 @@ export default function SourceCard({ source, index }) {
   const pct    = Math.round((source.relevance || 0) * 100)
 
   return (
-    <div className={`border ${colors.border} rounded-xl overflow-hidden mb-2`}>
-
+    <div
+      className={`border ${colors.border} rounded-xl overflow-hidden mb-2 transition-all ${
+        isActive ? `ring-2 ring-offset-1 ${
+          config.color === 'blue'   ? 'ring-blue-400'   :
+          config.color === 'purple' ? 'ring-purple-400' :
+                                      'ring-green-400'
+        }` : ''
+      }`}
+      onMouseEnter={() => onHover && onHover(index, config.color)}
+      onMouseLeave={() => onLeave && onLeave()}
+    >
       {/* Header */}
       <div
-        className={`flex items-center justify-between p-3 ${colors.bg} cursor-pointer`}
+        className={`flex items-center justify-between p-3 cursor-pointer transition-colors ${
+          isActive ? colors.activeBg : colors.bg
+        }`}
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center gap-2">
@@ -58,7 +81,6 @@ export default function SourceCard({ source, index }) {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Relevance bar */}
           <div className="flex items-center gap-1">
             <div className="w-16 h-1.5 bg-white rounded-full overflow-hidden">
               <div
@@ -88,7 +110,6 @@ export default function SourceCard({ source, index }) {
           </p>
         </div>
       )}
-
     </div>
   )
 }
