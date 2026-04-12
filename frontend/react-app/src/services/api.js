@@ -77,6 +77,21 @@ export const uploadDocument = async (
   )
   return res.data
 }
+// --- Compare Documents ---
+export const compareDocuments = async (
+  question,
+  document1,
+  document2,
+  nResults = 5,
+) => {
+  const res = await api.post('/query/compare', {
+    question,
+    document_1: document1,
+    document_2: document2,
+    n_results:  nResults,
+  })
+  return res.data
+}
 
 // --- Delete Document ---
 export const deleteDocument = async (documentId) => {

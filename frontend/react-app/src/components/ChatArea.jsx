@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Loader2, Bot } from 'lucide-react'
+import { Send, Loader2, Bot, GitCompare } from 'lucide-react'
 import MessageBubble from './MessageBubble'
-import { askQuestion } from '../services/api'
+import CompareView from './CompareView'
+import { askQuestion, compareDocuments } from '../services/api'
 
 const WELCOME_MESSAGE = {
   role:    'assistant',
@@ -16,22 +17,25 @@ export default function ChatArea({
   savedMessages,
   onMessagesUpdate,
 }) {
-  const [messages,     setMessages]     = useState(savedMessages || [WELCOME_MESSAGE])
-  const [input,        setInput]        = useState('')
-  const [loading,      setLoading]      = useState(false)
-  const [loadingSteps, setLoadingSteps] = useState([])
+  const [messages,      setMessages]      = useState(savedMessages || [WELCOME_MESSAGE])
+  const [input,         setInput]         = useState('')
+  const [loading,       setLoading]       = useState(false)
+  const [loadingSteps,  setLoadingSteps]  = useState([])
+  const [compareResult, setCompareResult] = useState(null)
+  const [compareMode,   setCompareMode]   = useState(false)
   const bottomRef = useRef(null)
   const inputRef  = useRef(null)
 
   // --- Load messages when chat changes ---
   useEffect(() => {
     setMessages(savedMessages || [WELCOME_MESSAGE])
+    setCompareResult(null)
   }, [currentChatId])
 
   // --- Auto scroll to bottom ---
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading])
+  }, [messages, loading, compareResult])
 
   // --- Handle sample question from sidebar ---
   useEffect(() => {
@@ -53,7 +57,71 @@ export default function ChatArea({
 
     setInput('')
     setLoading(true)
+    setCompareResult(null)
 
+    // Add user message
+    setMessages(prev => [...prev, {
+      role:    'user',
+      content: question,
+    }])
+
+    // --- Handle Compare Mode ---
+    if (compareMode) {
+      try {
+        // --- Initialize loading steps for compare ---
+        setLoadingSteps([
+          { label: '🔍 Searching Q2-2023...',        active: true,  done: false },
+          { label: '🔍 Searching Q3-2023...',        active: false, done: false },
+          { label: '🤖 Generating comparison...',    active: false, done: false },
+          { label: '✅ Building side by side view...', active: false, done: false },
+        ])
+
+        await new Promise(r => setTimeout(r, 600))
+        setLoadingSteps(prev => prev.map((s, i) =>
+          i === 0 ? { ...s, active: false, done: true } :
+          i === 1 ? { ...s, active: true }              : s
+        ))
+
+        await new Promise(r => setTimeout(r, 600))
+        setLoadingSteps(prev => prev.map((s, i) =>
+          i === 1 ? { ...s, active: false, done: true } :
+          i === 2 ? { ...s, active: true }              : s
+        ))
+
+        const result = await compareDocuments(
+          question,
+          'TSLA-Q2-2023.pdf',
+          'TSLA-Q3-2023.pdf',
+          5,
+        )
+
+        setLoadingSteps(prev => prev.map((s, i) =>
+          i === 2 ? { ...s, active: false, done: true } :
+          i === 3 ? { ...s, active: true }              : s
+        ))
+        await new Promise(r => setTimeout(r, 400))
+        setLoadingSteps(prev => prev.map((s, i) =>
+          i === 3 ? { ...s, active: false, done: true } : s
+        ))
+
+        setCompareResult(result)
+
+      } catch (err) {
+        setMessages(prev => [...prev, {
+          role:    'assistant',
+          content: '❌ Compare failed. Make sure both Q2-2023 and Q3-2023 are ingested.',
+          sources:  [],
+          metadata: {},
+        }])
+      } finally {
+        setLoading(false)
+        setLoadingSteps([])
+        inputRef.current?.focus()
+      }
+      return
+    }
+
+    // --- Normal Mode ---
     // --- Initialize loading steps ---
     const steps = [
       { label: '⚡ Embedding your question...',   active: true,  done: false },
@@ -62,12 +130,6 @@ export default function ChatArea({
       { label: '✅ Formatting response...',        active: false, done: false },
     ]
     setLoadingSteps(steps)
-
-    // Add user message
-    setMessages(prev => [...prev, {
-      role:    'user',
-      content: question,
-    }])
 
     try {
       // --- Step 1: Embedding ---
@@ -132,6 +194,13 @@ export default function ChatArea({
           <MessageBubble key={i} message={msg} />
         ))}
 
+        {/* Compare Result */}
+        {compareResult && (
+          <div className="mb-4">
+            <CompareView result={compareResult} />
+          </div>
+        )}
+
         {/* Loading Steps */}
         {loading && (
           <div className="flex items-start gap-2 mb-4 fade-in">
@@ -172,6 +241,32 @@ export default function ChatArea({
 
       {/* Input Area */}
       <div className="border-t border-slate-200 bg-white p-4">
+
+        {/* Compare Mode Toggle */}
+        <div className="flex items-center justify-between mb-3">
+          <button
+            onClick   = {() => {
+              setCompareMode(!compareMode)
+              setCompareResult(null)
+            }}
+            className = {`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              compareMode
+                ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-purple-50 hover:text-purple-600'
+            }`}
+          >
+            <GitCompare size={12} />
+            {compareMode ? 'Compare Mode ON' : 'Compare Mode'}
+          </button>
+
+          {compareMode && (
+            <span className="text-xs text-slate-400">
+              Q2-2023 vs Q3-2023
+            </span>
+          )}
+        </div>
+
+        {/* Input Box */}
         <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus-within:border-blue-400 focus-within:bg-white transition-all">
           <input
             ref         = {inputRef}
@@ -179,7 +274,10 @@ export default function ChatArea({
             value       = {input}
             onChange    = {e => setInput(e.target.value)}
             onKeyDown   = {e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-            placeholder = "Ask about Tesla's financials..."
+            placeholder = {compareMode
+              ? "Ask to compare Q2 vs Q3..."
+              : "Ask about Tesla's financials..."
+            }
             className   = "flex-1 bg-transparent text-sm text-slate-700 placeholder-slate-400 outline-none"
             disabled    = {loading}
           />
@@ -188,15 +286,21 @@ export default function ChatArea({
             disabled  = {!input.trim() || loading}
             className = {`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
               input.trim() && !loading
-                ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
+                ? compareMode
+                  ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
                 : 'bg-slate-200 text-slate-400 cursor-not-allowed'
             }`}
           >
             <Send size={14} />
           </button>
         </div>
+
         <p className="text-center text-xs text-slate-400 mt-2">
-          Powered by Multimodal RAG · 📝 Text · 📊 Tables · 📈 Charts
+          {compareMode
+            ? '🔄 Comparing Q2-2023 vs Q3-2023'
+            : 'Powered by Multimodal RAG · 📝 Text · 📊 Tables · 📈 Charts'
+          }
         </p>
       </div>
 
