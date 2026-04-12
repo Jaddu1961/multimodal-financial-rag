@@ -1,8 +1,8 @@
-import { Menu, Brain, Activity } from 'lucide-react'
+import { Menu, Brain, Activity, Plus } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { checkHealth } from '../services/api'
 
-export default function Navbar({ onToggleSidebar }) {
+export default function Navbar({ onToggleSidebar, onNewChat }) {
   const [online, setOnline] = useState(false)
 
   useEffect(() => {
@@ -19,8 +19,8 @@ export default function Navbar({ onToggleSidebar }) {
       {/* Left */}
       <div className="flex items-center gap-3">
         <button
-          onClick={onToggleSidebar}
-          className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+          onClick   = {onToggleSidebar}
+          className = "p-2 rounded-lg hover:bg-slate-100 transition-colors"
         >
           <Menu size={20} className="text-slate-600" />
         </button>
@@ -42,6 +42,17 @@ export default function Navbar({ onToggleSidebar }) {
 
       {/* Right */}
       <div className="flex items-center gap-2">
+
+        {/* New Chat Button */}
+        <button
+          onClick   = {onNewChat}
+          className = "flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-medium transition-colors border border-blue-200"
+        >
+          <Plus size={12} />
+          New Chat
+        </button>
+
+        {/* Status */}
         <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
           online
             ? 'bg-green-50 text-green-700 border border-green-200'

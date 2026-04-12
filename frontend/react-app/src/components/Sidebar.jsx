@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Database, FileText, Lightbulb, Settings, ChevronRight } from 'lucide-react'
+import {
+  Database, FileText, Lightbulb,
+  Settings, ChevronRight, MessageSquare, X
+} from 'lucide-react'
 import { getStats, getDocuments } from '../services/api'
 
 const SAMPLE_QUESTIONS = [
@@ -11,7 +14,15 @@ const SAMPLE_QUESTIONS = [
   "How many vehicles were delivered?",
 ]
 
-export default function Sidebar({ isOpen, onQuestionSelect }) {
+export default function Sidebar({
+  isOpen,
+  onQuestionSelect,
+  chatHistory = {},
+  currentChatId,
+  onNewChat,
+  onSelectChat,
+  onDeleteChat,
+}) {
   const [stats,    setStats]    = useState(null)
   const [docs,     setDocs]     = useState([])
   const [nResults, setNResults] = useState(8)
@@ -95,6 +106,57 @@ export default function Sidebar({ isOpen, onQuestionSelect }) {
           </p>
         )}
       </div>
+
+      {/* Chat History */}
+      {Object.keys(chatHistory).length > 0 && (
+        <div className="p-4 border-b border-slate-100">
+          <div className="flex items-center gap-2 mb-3">
+            <MessageSquare size={14} className="text-blue-600" />
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Recent Chats
+            </span>
+          </div>
+          <div className="space-y-1">
+            {Object.values(chatHistory)
+              .sort((a, b) => b.id.localeCompare(a.id))
+              .slice(0, 5)
+              .map(chat => (
+                <div
+                  key       = {chat.id}
+                  className = {`flex items-center justify-between p-2 rounded-xl cursor-pointer transition-all group ${
+                    chat.id === currentChatId
+                      ? 'bg-blue-50 border border-blue-200'
+                      : 'hover:bg-slate-50 border border-transparent'
+                  }`}
+                  onClick={() => onSelectChat(chat.id)}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-xs truncate ${
+                      chat.id === currentChatId
+                        ? 'text-blue-700 font-medium'
+                        : 'text-slate-600'
+                    }`}>
+                      {chat.title}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {chat.updatedAt}
+                    </p>
+                  </div>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation()
+                      onDeleteChat(chat.id)
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded-lg transition-all ml-1"
+                  >
+                    <X size={10} className="text-red-400" />
+                  </button>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
 
       {/* Sample Questions */}
       <div className="p-4 border-b border-slate-100 flex-1">

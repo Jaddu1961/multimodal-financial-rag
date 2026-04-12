@@ -10,25 +10,42 @@ const WELCOME_MESSAGE = {
   metadata: {},
 }
 
-export default function ChatArea({ selectedQuestion }) {
-  const [messages,     setMessages]     = useState([WELCOME_MESSAGE])
+export default function ChatArea({
+  selectedQuestion,
+  currentChatId,
+  savedMessages,
+  onMessagesUpdate,
+}) {
+  const [messages,     setMessages]     = useState(savedMessages || [WELCOME_MESSAGE])
   const [input,        setInput]        = useState('')
   const [loading,      setLoading]      = useState(false)
   const [loadingSteps, setLoadingSteps] = useState([])
   const bottomRef = useRef(null)
   const inputRef  = useRef(null)
 
-  // Auto scroll to bottom
+  // --- Load messages when chat changes ---
+  useEffect(() => {
+    setMessages(savedMessages || [WELCOME_MESSAGE])
+  }, [currentChatId])
+
+  // --- Auto scroll to bottom ---
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  // Handle sample question from sidebar
+  // --- Handle sample question from sidebar ---
   useEffect(() => {
     if (selectedQuestion) {
       handleSend(selectedQuestion)
     }
   }, [selectedQuestion])
+
+  // --- Save messages when they change ---
+  useEffect(() => {
+    if (onMessagesUpdate && messages.length > 1) {
+      onMessagesUpdate(currentChatId, messages)
+    }
+  }, [messages])
 
   const handleSend = async (questionOverride = null) => {
     const question = questionOverride || input.trim()
@@ -67,7 +84,7 @@ export default function ChatArea({ selectedQuestion }) {
         i === 2 ? { ...s, active: true }              : s
       ))
 
-      // --- Step 3: API Call (actual work) ---
+      // --- Step 3: API Call ---
       const data = await askQuestion(question, 8)
 
       // --- Step 4: Formatting ---
@@ -115,7 +132,7 @@ export default function ChatArea({ selectedQuestion }) {
           <MessageBubble key={i} message={msg} />
         ))}
 
-        {/* Loading Steps Indicator */}
+        {/* Loading Steps */}
         {loading && (
           <div className="flex items-start gap-2 mb-4 fade-in">
             <div className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -130,10 +147,7 @@ export default function ChatArea({ selectedQuestion }) {
                         <span className="text-green-600 text-xs">✓</span>
                       </div>
                     ) : step.active ? (
-                      <Loader2
-                        size={14}
-                        className="text-blue-600 animate-spin flex-shrink-0"
-                      />
+                      <Loader2 size={14} className="text-blue-600 animate-spin flex-shrink-0" />
                     ) : (
                       <div className="w-4 h-4 rounded-full bg-slate-100 flex-shrink-0" />
                     )}
