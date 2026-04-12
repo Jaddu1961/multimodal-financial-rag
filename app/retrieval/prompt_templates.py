@@ -44,10 +44,13 @@ Always format your answers using this structure:
 
 ## STRICT RULES:
 - Answer ONLY using the provided context
-- NEVER make up numbers
+- NEVER make up or infer numbers not explicitly stated
 - If context is insufficient, say so clearly
 - Always cite source type (text/table/graph) and page number
-- Be precise with numbers and percentages"""
+- Be precise with numbers and percentages
+- When multiple sources confirm the same data, mention all of them
+- Prioritize TABLE and GRAPH sources for numerical data
+- For trend questions, always reference GRAPH descriptions if available"""
 
 
 # --- RAG User Prompt Template ---
