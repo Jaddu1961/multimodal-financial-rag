@@ -56,6 +56,7 @@ def answer_question(
             "chunk_type":  chunk["metadata"].get("chunk_type"),
             "page_number": chunk["metadata"].get("page_number"),
             "source_file": chunk["metadata"].get("source_file"),
+            "document_id": chunk["metadata"].get("document_id", ""),
             "relevance":   round(chunk.get("score", 0), 3),
             "preview":     chunk["text"][:150] + "..."
                            if len(chunk["text"]) > 150

@@ -29,6 +29,7 @@ class SourceChunk(BaseModel):
     source_file: str
     relevance:   float
     preview:     str
+    document_id: str = ""
 
 
 class QueryResponse(BaseModel):

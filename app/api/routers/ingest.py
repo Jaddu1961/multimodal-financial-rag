@@ -7,6 +7,7 @@ import time
 import shutil
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+from fastapi.responses import FileResponse
 from app.api.schemas.ingest_schema import (
     IngestResponse,
     DeleteResponse,
@@ -91,7 +92,7 @@ async def ingest_document(
             try:
                 page_images  = extract_page_images(loaded_pdf)
                 graph_chunks = describe_graphs_in_pages(page_images, loaded_pdf)
-                cleanup_images(loaded_pdf.document_id)
+                # cleanup_images(loaded_pdf.document_id)
             except Exception as e:
                 logger.warning(f"⚠️  Graph extraction failed: {e}. Continuing without graphs.")
 
@@ -156,3 +157,30 @@ async def get_vector_store_stats():
     """Get current vector store statistics"""
     stats = get_stats()
     return StatsResponse(**stats)
+
+@router.get("/image/{document_id}/{page_number}")
+async def get_page_image(document_id: str, page_number: int):
+    """
+    Serve a page image for a specific document and page.
+    Used to display charts in the frontend.
+    """
+    from pathlib import Path
+    from config.settings import settings
+
+    # Build image path
+    image_path = (
+        Path(settings.IMAGES_PATH)
+        / document_id
+        / f"page_{page_number:03d}.png"
+    )
+
+    if not image_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Image not found for page {page_number}"
+        )
+
+    return FileResponse(
+        path      = str(image_path),
+        media_type= "image/png",
+    )
